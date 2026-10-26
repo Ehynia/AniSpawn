@@ -1,5 +1,30 @@
-# AniSpawn
+# AniSpawn 0.5.15
 
-Desktop anime client. The current 0.5.15 Python/Chromium source archive must be imported into this repository before building Windows artifacts. The previous Electron 0.4 workflow does not build the current desktop application.
+Настольный клиент для аниме с объединённым каталогом источников, их состояниями, DNS/прокси и импортом публичных страниц. **RUTUBE и VK не используются.**
 
-Windows packaging is being prepared separately; no Windows 0.5.15 executable has been validated yet.
+## Windows x64 portable — тестовая версия
+
+Исходники 0.5.15 загружены в репозиторий в `AniSpawn-0.5.15-Linux-Source.zip`. GitHub Actions самостоятельно извлекает проверенный SHA-256 архив, адаптирует запуск под Windows и собирает отдельный ZIP.
+
+[Windows-сборки в GitHub Actions](https://github.com/Ehynia/AniSpawn/actions/workflows/windows.yml)
+
+Откройте завершившийся **зелёный** запуск, в разделе **Artifacts** скачайте `AniSpawn-0.5.15-Windows-x64-portable`. Распакуйте его полностью и запустите `AniSpawn.exe` из папки AniSpawn. Никакие npm, Python, FFmpeg и Chromium отдельно устанавливать не требуется. При запуске может появиться стандартное предупреждение Windows о неподписанном файле. Не запускайте неизвестные сторонние сборки.
+
+Состав сборки:
+- `AniSpawn.exe` — Windows PyInstaller `--onedir --windowed`;
+- `_internal/desktop` — исходники Python;
+- `_internal/renderer` — локальные HTML/CSS/JS;
+- `_internal/runtime/ffmpeg/ffmpeg.exe` и `ffprobe.exe` — статические LGPL Windows сборки FFmpeg;
+- `_internal/runtime/chromium/chrome.exe` — отдельный Chrome for Testing и его DLL/resources.
+
+Данные сохраняются в `%APPDATA%\AniSpawn`, кэш — `%LOCALAPPDATA%\AniSpawn`. Portable означает, что приложению не нужны системные установки зависимостей; пользовательские настройки не лежат рядом с исполняемым файлом.
+
+Сборка проверяет импорт исходников, профильные Python-тесты, наличие бинарников, запуск `ffmpeg.exe` и `chrome.exe`, открытие UI и локального RPC уже из упакованного исполняемого файла. Это **не** проверка реального воспроизведения из российских сетей или графического окна на компьютере пользователя.
+
+## Важные ограничения
+
+Бинарники Chrome for Testing и FFmpeg загружаются на Windows-раннере из внешних официальных/открытых дистрибутивов, а не хранятся в Git. Windows-артефакт публикуется только после успешной локальной проверки. Для новых выпусков необходимо отдельно подтвердить условия лицензий сторонних бинарников и поведение SmartScreen.
+
+## Linux
+
+Архив исходников 0.5.15 содержит прежний Linux-сценарий создания DEB, документацию и тесты. Windows-сборка не изменяет ни API, ни ограничения поставщиков контента.
