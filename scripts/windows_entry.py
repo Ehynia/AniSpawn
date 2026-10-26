@@ -24,7 +24,7 @@ def packaged_selftest():
     assert browser and Path(browser).is_file(), 'Bundled Chrome is absent'
     assert ffmpeg.is_file(), 'Bundled FFmpeg is absent'
     for name, binary in [('chromium', browser), ('ffmpeg', str(ffmpeg))]:
-        result = subprocess.run([binary, '-version'], capture_output=True, text=True, timeout=30)
+        result = subprocess.run([binary, '--version' if name == 'chromium' else '-version'], capture_output=True, text=True, timeout=30)
         assert result.returncode == 0, name + ': ' + (result.stderr or '')[:350]
         checks[name] = True
     with tempfile.TemporaryDirectory(prefix='anispawn-win-smoke-') as tmp:
