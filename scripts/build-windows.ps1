@@ -19,7 +19,7 @@ $src = Join-Path $extract 'AniSpawn'
 if (!(Test-Path (Join-Path $src 'desktop/server.py'))) { throw 'ZIP did not unpack into AniSpawn/desktop/server.py.' }
 python (Join-Path $repo 'scripts/windows_prepare.py') $src
 if ($LASTEXITCODE -ne 0) { throw 'Windows source adaptation failed.' }
-python -m pip install --disable-pip-version-check 'pyinstaller==6.16.0' 'pytest==8.4.2'
+python -m pip install --disable-pip-version-check 'pyinstaller==6.16.0' 'pytest==8.4.2' 'pillow==12.0.0'
 if ($LASTEXITCODE -ne 0) { throw 'Python build dependencies unavailable.' }
 Push-Location $src
 try {
