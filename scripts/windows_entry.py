@@ -50,6 +50,8 @@ def _desktop_mutex():
     kernel = ctypes.WinDLL('kernel32', use_last_error=True)
     kernel.CreateMutexW.argtypes = (wintypes.LPVOID, wintypes.BOOL, wintypes.LPCWSTR)
     kernel.CreateMutexW.restype = wintypes.HANDLE
+    kernel.CloseHandle.argtypes = (wintypes.HANDLE,)
+    kernel.CloseHandle.restype = wintypes.BOOL
     handle = kernel.CreateMutexW(None, False, 'Local\\AniSpawn_0_5_15_Desktop')
     if not handle:
         raise ctypes.WinError(ctypes.get_last_error())
