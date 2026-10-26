@@ -7,6 +7,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import traceback
 import urllib.request
 
 ROOT = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parent))
@@ -55,6 +56,11 @@ def packaged_selftest():
 
 if __name__ == '__main__':
     if '--packaged-selftest' in sys.argv:
-        packaged_selftest()
+        try:
+            packaged_selftest()
+        except BaseException as exc:
+            target = Path(os.environ.get('ANISPAWN_SELFTEST_REPORT', str(Path(tempfile.gettempdir())/'anispawn-windows-selftest.json')))
+            target.write_text(json.dumps({'ok': False, 'error': str(exc), 'traceback': traceback.format_exc()}, indent=2), encoding='utf-8')
+            sys.exit(1)
     else:
         runpy.run_path(str(ROOT / 'desktop' / 'server.py'), run_name='__main__')
