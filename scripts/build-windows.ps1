@@ -108,6 +108,41 @@ if (!$result.ok -or !$result.checks.loopback_rpc -or !$result.checks.chromium -o
   throw 'Windows package did not pass renderer, RPC, Chromium and FFmpeg checks.'
 }
 
+# Windows mutex semantics: another desktop instance must not share Chrome's
+# persistent browser profile and accidentally kill its loopback backend.
+$mutexTest = @'
+import sys
+sys.path.insert(0, sys.argv[1])
+import windows_entry as w
+lock = w._desktop_mutex()
+assert isinstance(lock, tuple), "First launch did not acquire a mutex"
+try:
+    assert w._desktop_mutex() is False, "Second launch was not rejected"
+finally:
+    assert lock[0].CloseHandle(lock[1]), "Win32 mutex could not be released"
+print("Windows desktop mutex check passed")
+'@
+$mutexTest | python - (Join-Path $repo 'scripts')
+if ($LASTEXITCODE -ne 0) { throw 'Windows desktop mutex check failed.' }
+
+# Public Proton diagnostic flag must generate a report in APPDATA by default.
+Remove-Item Env:ANISPAWN_SELFTEST_REPORT -ErrorAction SilentlyContinue
+$protonReport = Join-Path $env:APPDATA 'AniSpawn/proton-diagnostics.json'
+if (Test-Path $protonReport) { Remove-Item $protonReport -Force }
+$diag = Start-Process -FilePath $exe -ArgumentList '--proton-diagnostics' -PassThru
+if (!$diag.WaitForExit(120000)) {
+  $diag.Kill()
+  throw 'Proton diagnostic flag timed out on native Windows.'
+}
+if ($diag.ExitCode -ne 0 -or !(Test-Path $protonReport)) {
+  throw "Proton diagnostic command did not produce report (exit code: $($diag.ExitCode))."
+}
+$protonCheck = Get-Content $protonReport -Raw | ConvertFrom-Json
+if (!$protonCheck.ok -or !$protonCheck.checks.loopback_rpc) {
+  throw 'Proton diagnostic report is not valid.'
+}
+Write-Host 'Proton diagnostic entrypoint passed on Windows (not a Proton runtime test).'
+
 $zipPath = Join-Path $dist 'AniSpawn-0.5.15-Windows-x64-portable.zip'
 if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
 Compress-Archive -LiteralPath $app -DestinationPath $zipPath -CompressionLevel Optimal
