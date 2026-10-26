@@ -1,0 +1,30 @@
+name: Windows 0.5.15 portable (Python desktop)
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'desktop/**'
+      - 'renderer/**'
+      - 'scripts/build-windows.ps1'
+      - '.github/workflows/windows.yml'
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate source tree
+        shell: pwsh
+        run: |
+          if (!(Test-Path desktop/server.py) -or !(Test-Path renderer/index.html)) {
+            throw 'Import the AniSpawn 0.5.15 Python desktop source archive first. Electron 0.4 is not the target.'
+          }
+      - name: Build portable distribution
+        shell: pwsh
+        run: ./scripts/build-windows.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AniSpawn-0.5.15-Windows-portable
+          path: dist/AniSpawn-Windows/**
