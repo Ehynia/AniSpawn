@@ -1,5 +1,7 @@
 """PyInstaller entrypoint for AniSpawn 0.5.15 Windows portable (no installed Python)."""
 from pathlib import Path
+import contextlib
+import datetime
 import json
 import os
 import runpy
@@ -12,6 +14,82 @@ import urllib.request
 
 ROOT = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parent))
 sys.path.insert(0, str(ROOT / 'desktop'))
+
+
+def _data_dir():
+    # Proton provides Windows %APPDATA% inside the Steam compatdata prefix.
+    base = os.environ.get('APPDATA') or os.environ.get('LOCALAPPDATA') or tempfile.gettempdir()
+    directory = Path(base) / 'AniSpawn'
+    directory.mkdir(parents=True, exist_ok=True)
+    return directory
+
+
+def _report_path():
+    override = os.environ.get('ANISPAWN_SELFTEST_REPORT')
+    if override:
+        return Path(override)
+    if '--proton-diagnostics' in sys.argv:
+        return _data_dir() / 'proton-diagnostics.json'
+    return Path(tempfile.gettempdir()) / 'anispawn-windows-selftest.json'
+
+
+def _write_report(value):
+    target = _report_path()
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(value, indent=2, ensure_ascii=False), encoding='utf-8')
+
+
+def _desktop_mutex():
+    # A second Chrome --app invocation with the same profile forwards its URL to
+    # an existing browser and exits immediately. This would kill the second
+    # process's local server and leave that newly opened window unusable.
+    if os.name != 'nt':
+        return None
+    import ctypes
+    from ctypes import wintypes
+    kernel = ctypes.WinDLL('kernel32', use_last_error=True)
+    kernel.CreateMutexW.argtypes = (wintypes.LPVOID, wintypes.BOOL, wintypes.LPCWSTR)
+    kernel.CreateMutexW.restype = wintypes.HANDLE
+    handle = kernel.CreateMutexW(None, False, 'Local\\AniSpawn_0_5_15_Desktop')
+    if not handle:
+        raise ctypes.WinError(ctypes.get_last_error())
+    already_running = ctypes.get_last_error() == 183  # ERROR_ALREADY_EXISTS
+    if already_running:
+        kernel.CloseHandle(handle)
+        return False
+    return kernel, handle
+
+
+def _run_desktop():
+    logpath = _data_dir() / 'launch.log'
+    if logpath.exists() and logpath.stat().st_size > 1_048_576:
+        logpath.replace(logpath.with_suffix('.previous.log'))
+    with logpath.open('a', encoding='utf-8') as log:
+        log.write('\n[' + datetime.datetime.now().isoformat(timespec='seconds') +
+                  '] AniSpawn 0.5.15 starting; Proton env=' +
+                  str(bool(os.environ.get('STEAM_COMPAT_DATA_PATH'))) + '\n')
+        log.flush()
+        lock = None
+        try:
+            lock = _desktop_mutex()
+            if lock is False:
+                log.write('Another AniSpawn instance already owns the browser profile.\n')
+                log.flush()
+                return
+            with contextlib.redirect_stdout(log), contextlib.redirect_stderr(log):
+                runpy.run_path(str(ROOT / 'desktop' / 'server.py'), run_name='__main__')
+        except SystemExit as exc:
+            if exc.code not in (0, None):
+                log.write('AniSpawn exited with error code ' + repr(exc.code) + '\n')
+                log.flush()
+            raise
+        except BaseException:
+            traceback.print_exc(file=log)
+            log.flush()
+            raise
+        finally:
+            if isinstance(lock, tuple):
+                lock[0].CloseHandle(lock[1])
 
 
 def packaged_selftest():
@@ -63,17 +141,19 @@ def packaged_selftest():
         finally:
             httpd.shutdown()
             httpd.server_close()
-    target = Path(os.environ.get('ANISPAWN_SELFTEST_REPORT', str(Path(tempfile.gettempdir())/'anispawn-windows-selftest.json')))
-    target.write_text(json.dumps({'ok':True, 'checks': checks}, indent=2), encoding='utf-8')
+    _write_report({'ok': True, 'checks': checks,
+                   'proton_environment': bool(os.environ.get('STEAM_COMPAT_DATA_PATH')),
+                   'limitations': ['headless browser only', 'no actual video playback test',
+                                   'no browser GPU compositor test']})
 
 
 if __name__ == '__main__':
-    if '--packaged-selftest' in sys.argv:
+    if '--packaged-selftest' in sys.argv or '--proton-diagnostics' in sys.argv:
         try:
             packaged_selftest()
         except BaseException as exc:
-            target = Path(os.environ.get('ANISPAWN_SELFTEST_REPORT', str(Path(tempfile.gettempdir())/'anispawn-windows-selftest.json')))
-            target.write_text(json.dumps({'ok': False, 'error': str(exc), 'traceback': traceback.format_exc()}, indent=2), encoding='utf-8')
+            _write_report({'ok': False, 'error': str(exc), 'traceback': traceback.format_exc(),
+                           'proton_environment': bool(os.environ.get('STEAM_COMPAT_DATA_PATH'))})
             sys.exit(1)
     else:
-        runpy.run_path(str(ROOT / 'desktop' / 'server.py'), run_name='__main__')
+        _run_desktop()
