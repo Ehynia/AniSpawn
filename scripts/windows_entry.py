@@ -24,10 +24,23 @@ def packaged_selftest():
     ffmpeg = server.RUNTIME / 'ffmpeg' / ('ffmpeg.exe' if os.name == 'nt' else 'ffmpeg')
     assert browser and Path(browser).is_file(), 'Bundled Chrome is absent'
     assert ffmpeg.is_file(), 'Bundled FFmpeg is absent'
-    for name, binary in [('chromium', browser), ('ffmpeg', str(ffmpeg))]:
-        result = subprocess.run([binary, '--version' if name == 'chromium' else '-version'], capture_output=True, text=True, timeout=30)
-        assert result.returncode == 0, name + ': ' + (result.stderr or '')[:350]
-        checks[name] = True
+    # Chrome for Testing is a GUI-subsystem executable on Windows. Calling
+    # chrome.exe --version can launch a long-running GUI process instead of
+    # returning a version string. Verify a real local headless page instead.
+    with tempfile.TemporaryDirectory(prefix='anispawn-browser-test-') as profile:
+        chrome_cmd = [browser, '--headless=new', '--disable-gpu',
+                      '--disable-background-networking', '--no-first-run',
+                      '--no-default-browser-check', '--user-data-dir=' + profile,
+                      '--dump-dom', 'data:text/html,<title>AniSpawnSmoke</title>']
+        browser_result = subprocess.run(chrome_cmd, stdout=subprocess.PIPE,
+                                        stderr=subprocess.DEVNULL, timeout=50)
+        assert browser_result.returncode == 0, 'Chrome headless test failed'
+        assert b'AniSpawnSmoke' in browser_result.stdout, 'Chrome did not render test page'
+    checks['chromium'] = True
+    result = subprocess.run([str(ffmpeg), '-version'], capture_output=True,
+                            text=True, timeout=30)
+    assert result.returncode == 0, 'FFmpeg self-test failed: ' + (result.stderr or '')[:350]
+    checks['ffmpeg'] = True
     with tempfile.TemporaryDirectory(prefix='anispawn-win-smoke-') as tmp:
         backend = server.Backend(user_dir=tmp)
         assert str(backend.ffmpeg) == str(ffmpeg)
