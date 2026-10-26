@@ -1,30 +1,40 @@
-name: Windows 0.5.15 portable (Python desktop)
+name: AniSpawn 0.5.15 Windows portable
 on:
   workflow_dispatch:
   push:
     paths:
-      - 'desktop/**'
-      - 'renderer/**'
+      - 'AniSpawn-0.5.15-Linux-Source.zip'
       - 'scripts/build-windows.ps1'
+      - 'scripts/windows_prepare.py'
+      - 'scripts/windows_entry.py'
       - '.github/workflows/windows.yml'
+permissions:
+  contents: read
 jobs:
   windows:
     runs-on: windows-latest
+    timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Checkout source ZIP and build scripts
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Validate source tree
-        shell: pwsh
-        run: |
-          if (!(Test-Path desktop/server.py) -or !(Test-Path renderer/index.html)) {
-            throw 'Import the AniSpawn 0.5.15 Python desktop source archive first. Electron 0.4 is not the target.'
-          }
-      - name: Build portable distribution
+      - name: Prepare and validate standalone Windows portable package
         shell: pwsh
         run: ./scripts/build-windows.ps1
-      - uses: actions/upload-artifact@v4
+      - name: Upload tested portable Windows ZIP
+        uses: actions/upload-artifact@v4
         with:
-          name: AniSpawn-0.5.15-Windows-portable
-          path: dist/AniSpawn-Windows/**
+          name: AniSpawn-0.5.15-Windows-x64-portable
+          path: dist/AniSpawn-0.5.15-Windows-x64-portable.zip
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload smoke-test report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AniSpawn-windows-smoke-failure
+          path: ${{ runner.temp }}/anispawn-windows-selftest.json
+          if-no-files-found: ignore
