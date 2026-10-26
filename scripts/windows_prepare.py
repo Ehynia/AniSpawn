@@ -20,7 +20,7 @@ def patch(root: Path):
         ("Path(user_dir or os.getenv('XDG_CONFIG_HOME') or Path.home()/'.config')",
          "Path(user_dir or (os.getenv('APPDATA') if os.name=='nt' else os.getenv('XDG_CONFIG_HOME')) or Path.home()/'.config')"),
         ("Path(os.getenv('XDG_CACHE_HOME') or Path.home()/'.cache')",
-         "Path((os.getenv('LOCALAPPDATA') if os.name=='nt' else os.getenv('XDG_CACHE_HOME')) or Path.home()/'.cache')"),
+         "Path(os.getenv('XDG_CACHE_HOME') or (os.getenv('LOCALAPPDATA') if os.name=='nt' else None) or Path.home()/'.cache')"),
         ("RUNTIME/'ffmpeg'/'ffmpeg'",
          "RUNTIME/'ffmpeg'/('ffmpeg.exe' if os.name=='nt' else 'ffmpeg')"),
         ("""def chromium_path():
