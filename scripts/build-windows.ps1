@@ -3,6 +3,7 @@
 # Executed only on a Windows x64 GitHub Actions runner with internet access.
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
+$env:PYTHONUTF8 = '1'  # HTML and UI text are UTF-8; Windows runner defaults to cp1252.
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 Set-Location $repo
 $archive = Join-Path $repo 'AniSpawn-0.5.15-Linux-Source.zip'
