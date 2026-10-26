@@ -36,6 +36,22 @@ def patch(root: Path):
  if bundled.is_file():return str(bundled)
  return shutil.which('chromium') or shutil.which('chromium-browser')"""),
     ]
+    # A GUI-subsystem PyInstaller process has no console, so preserve the
+    # browser's stderr in the Wine/Proton prefix for crash diagnosis.
+    browser_spawn = (
+        "  p=subprocess.Popen(command,cwd=str(RUNTIME/'chromium') if "
+        "(RUNTIME/'chromium').exists() else None,env=env)\n"
+        "  return p.wait()"
+    )
+    browser_spawn_logged = (
+        "  with (backend.directory/'chromium-stderr.log').open('ab') as browser_log:\n"
+        "   p=subprocess.Popen(command,cwd=str(RUNTIME/'chromium') if "
+        "(RUNTIME/'chromium').exists() else None,env=env,"
+        "stdout=subprocess.DEVNULL,stderr=browser_log)\n"
+        "   return p.wait()"
+    )
+    changes.append((browser_spawn, browser_spawn_logged))
+
     for before, after in changes:
         count = code.count(before)
         if count not in (1, 2, 4):
